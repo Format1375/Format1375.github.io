@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로또 번호 생성 및 당첨 시뮬레이터</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f3f4f6; }
+        .lotto-ball {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s;
+        }
+        .lotto-ball:hover { transform: scale(1.1); }
+        .ball-1 { background: radial-gradient(circle at 30% 30%, #facc15, #ca8a04); } /* 1-10 노랑 */
+        .ball-2 { background: radial-gradient(circle at 30% 30%, #60a5fa, #2563eb); } /* 11-20 파랑 */
+        .ball-3 { background: radial-gradient(circle at 30% 30%, #f87171, #dc2626); } /* 21-30 빨강 */
+        .ball-4 { background: radial-gradient(circle at 30% 30%, #9ca3af, #4b5563); } /* 31-40 회색 */
+        .ball-5 { background: radial-gradient(circle at 30% 30%, #4ade80, #16a34a); } /* 41-45 초록 */
+        .selected { border: 3px solid #1f2937; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto space-y-6">
+        <!-- 헤더 -->
+        <header class="text-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+            <h1 class="text-3xl font-bold text-gray-800">로또 6/45 시스템</h1>
+            <p class="text-gray-500 mt-2">행운의 번호를 추출하거나 당첨 결과를 확인해보세요!</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 번호 생성 섹션 -->
+            <section class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                    <span>🎰</span> 번호 생성
+                </h2>
+                
+                <div id="generated-numbers" class="flex flex-wrap gap-2 justify-center py-8 bg-gray-50 rounded-xl mb-4 min-h-[100px] items-center">
+                    <p class="text-gray-400 italic">버튼을 눌러 번호를 생성하세요</p>
+                </div>
+
+                <div class="flex gap-2">
+                    <button onclick="generateRandomLotto()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition duration-200 shadow-md">
+                        자동 번호 추출
+                    </button>
+                    <button onclick="resetUI()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded-xl transition duration-200">
+                        초기화
+                    </button>
+                </div>
+            </section>
+
+            <!-- 당첨 시뮬레이터 -->
+            <section class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                    <span>🏆</span> 당첨 시뮬레이터
+                </h2>
+                <div class="text-sm text-gray-600 mb-4">
+                    현재 생성된 번호로 이번 주 가상 당첨 번호와 대조합니다.
+                </div>
+                
+                <div id="lotto-draw-result" class="hidden">
+                    <div class="mb-2 font-semibold text-gray-700">금주의 가상 당첨 번호:</div>
+                    <div id="draw-balls" class="flex gap-1 mb-4"></div>
+                    <div id="match-status" class="p-4 rounded-xl text-center font-bold text-lg"></div>
+                </div>
+
+                <button id="draw-btn" onclick="simulateDraw()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl transition duration-200 shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed" disabled>
+                    당첨 확인하기 (번호 생성 필요)
+                </button>
+            </section>
+        </div>
+
+        <!-- 번호 기록 -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+            <h2 class="text-xl font-bold mb-4">최근 생성 기록</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-gray-500 border-b">
+                            <th class="pb-3">일시</th>
+                            <th class="pb-3 text-center">번호</th>
+                            <th class="pb-3 text-right">관리</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body">
+                        <tr>
+                            <td colspan="3" class="py-8 text-center text-gray-400">생성 기록이 없습니다.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        let currentNumbers = [];
+        let history = [];
+
+        function getBallClass(num) {
+            if (num <= 10) return 'ball-1';
+            if (num <= 20) return 'ball-2';
+            if (num <= 30) return 'ball-3';
+            if (num <= 40) return 'ball-4';
+            return 'ball-5';
+        }
+
+        function generateRandomLotto() {
+            let numbers = [];
+            while(numbers.length < 6) {
+                let r = Math.floor(Math.random() * 45) + 1;
+                if(numbers.indexOf(r) === -1) numbers.push(r);
+            }
+            numbers.sort((a, b) => a - b);
+            currentNumbers = numbers;
+            renderGeneratedNumbers(numbers);
+            addToHistory(numbers);
+            
+            // 당첨 확인 버튼 활성화
+            document.getElementById('draw-btn').disabled = false;
+            document.getElementById('lotto-draw-result').classList.add('hidden');
+        }
+
+        function renderGeneratedNumbers(numbers) {
+            const container = document.getElementById('generated-numbers');
+            container.innerHTML = '';
+            numbers.forEach(num => {
+                const ball = document.createElement('div');
+                ball.className = `lotto-ball ${getBallClass(num)}`;
+                ball.innerText = num;
+                container.appendChild(ball);
+            });
+        }
+
+        function addToHistory(numbers) {
+            const now = new Date();
+            const timeStr = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+            history.unshift({ time: timeStr, nums: [...numbers] });
+            if (history.length > 5) history.pop();
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const body = document.getElementById('history-body');
+            if (history.length === 0) {
+                body.innerHTML = '<tr><td colspan="3" class="py-8 text-center text-gray-400">생성 기록이 없습니다.</td></tr>';
+                return;
+            }
+            body.innerHTML = history.map((item, idx) => `
+                <tr class="border-b last:border-0 hover:bg-gray-50 transition">
+                    <td class="py-3 text-sm text-gray-500">${item.time}</td>
+                    <td class="py-3">
+                        <div class="flex gap-1 justify-center">
+                            ${item.nums.map(n => `<span class="w-6 h-6 rounded-full ${getBallClass(n)} text-[10px] flex items-center justify-center text-white font-bold">${n}</span>`).join('')}
+                        </div>
+                    </td>
+                    <td class="py-3 text-right">
+                        <button onclick="removeHistory(${idx})" class="text-red-400 hover:text-red-600 text-sm">삭제</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function removeHistory(index) {
+            history.splice(index, 1);
+            renderHistory();
+        }
+
+        function resetUI() {
+            currentNumbers = [];
+            document.getElementById('generated-numbers').innerHTML = '<p class="text-gray-400 italic">버튼을 눌러 번호를 생성하세요</p>';
+            document.getElementById('draw-btn').disabled = true;
+            document.getElementById('lotto-draw-result').classList.add('hidden');
+        }
+
+        function simulateDraw() {
+            if (currentNumbers.length < 6) return;
+
+            // 당첨 번호 추첨 (6개 + 보너스 1개)
+            let drawNumbers = [];
+            while(drawNumbers.length < 7) {
+                let r = Math.floor(Math.random() * 45) + 1;
+                if(drawNumbers.indexOf(r) === -1) drawNumbers.push(r);
+            }
+            
+            const winningNums = drawNumbers.slice(0, 6).sort((a, b) => a - b);
+            const bonusNum = drawNumbers[6];
+
+            // 렌더링
+            const drawContainer = document.getElementById('draw-balls');
+            drawContainer.innerHTML = '';
+            winningNums.forEach(num => {
+                const ball = document.createElement('div');
+                ball.className = `lotto-ball ${getBallClass(num)} scale-75`;
+                ball.innerText = num;
+                drawContainer.appendChild(ball);
+            });
+            
+            const plus = document.createElement('div');
+            plus.className = "flex items-center text-gray-400 font-bold px-1";
+            plus.innerText = "+";
+            drawContainer.appendChild(plus);
+
+            const bonusBall = document.createElement('div');
+            bonusBall.className = `lotto-ball ${getBallClass(bonusNum)} scale-75 border-4 border-yellow-200`;
+            bonusBall.innerText = bonusNum;
+            drawContainer.appendChild(bonusBall);
+
+            // 매칭 계산
+            const matched = currentNumbers.filter(n => winningNums.includes(n));
+            const bonusMatched = currentNumbers.includes(bonusNum);
+            
+            const statusDiv = document.getElementById('match-status');
+            let resultText = "";
+            let bgColor = "";
+            let textColor = "";
+
+            if (matched.length === 6) {
+                resultText = "🎉 1등 당첨! (6개 일치)";
+                bgColor = "bg-yellow-100";
+                textColor = "text-yellow-700";
+            } else if (matched.length === 5 && bonusMatched) {
+                resultText = "🎊 2등 당첨! (5개 + 보너스 일치)";
+                bgColor = "bg-orange-100";
+                textColor = "text-orange-700";
+            } else if (matched.length === 5) {
+                resultText = "🎈 3등 당첨! (5개 일치)";
+                bgColor = "bg-blue-100";
+                textColor = "text-blue-700";
+            } else if (matched.length === 4) {
+                resultText = "✅ 4등 당첨! (4개 일치)";
+                bgColor = "bg-green-100";
+                textColor = "text-green-700";
+            } else if (matched.length === 3) {
+                resultText = "🥉 5등 당첨! (3개 일치)";
+                bgColor = "bg-gray-100";
+                textColor = "text-gray-700";
+            } else {
+                resultText = `낙첨 (${matched.length}개 일치)`;
+                bgColor = "bg-red-50";
+                textColor = "text-red-500";
+            }
+
+            statusDiv.innerText = resultText;
+            statusDiv.className = `p-4 rounded-xl text-center font-bold text-lg ${bgColor} ${textColor}`;
+            
+            document.getElementById('lotto-draw-result').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
+
