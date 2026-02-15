@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MY CHAT</title>
+    <title>MY CHAT - Admin Panel</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Firebase App & Services (Compat Version for high compatibility) -->
+    <!-- Firebase App & Services -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -17,39 +17,36 @@
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
         body { font-family: 'Pretendard', sans-serif; }
         .chat-container { height: calc(100vh - 130px); }
+        .admin-mode { border-color: #ef4444 !important; }
+        .admin-bg { background-color: #fef2f2; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="bg-slate-100 h-screen">
-    <div id="app" class="max-w-md mx-auto h-full bg-white shadow-2xl flex flex-col relative">
+    <div id="app" class="max-w-md mx-auto h-full bg-white shadow-2xl flex flex-col relative transition-all duration-300">
         <!-- 로딩 화면 -->
         <div id="loading" class="absolute inset-0 z-50 bg-white flex flex-col items-center justify-center">
             <div class="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-            <p class="mt-4 text-slate-500 font-medium">연결 중...</p>
+            <p class="mt-4 text-slate-500 font-medium">서버 연결 중...</p>
         </div>
 
         <!-- 인증 화면 -->
         <div id="auth-screen" class="hidden flex-1 flex flex-col items-center justify-center p-8">
-            <div class="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg">
-                <i data-lucide="message-circle" class="w-10 h-10"></i>
+            <div id="auth-logo" class="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg transition-colors">
+                <i data-lucide="shield-check" class="w-10 h-10"></i>
             </div>
             <h2 id="auth-title" class="text-2xl font-bold text-slate-800 mb-2">반가워요!</h2>
-            <p class="text-slate-500 mb-8 text-sm text-center">나만의 실시간 채팅을 시작하세요</p>
+            <p class="text-slate-500 mb-8 text-sm text-center">Admin으로 가입하면 관리 기능을 사용할 수 있습니다.</p>
             
             <div class="w-full space-y-3">
-                <input id="auth-name" type="text" placeholder="닉네임" class="hidden w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
-                <input id="auth-email" type="email" placeholder="이메일" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
-                <input id="auth-pw" type="password" placeholder="비밀번호 (6자 이상)" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                <input id="auth-name" type="text" placeholder="닉네임 (관리자는 'Admin' 입력)" class="hidden w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                <input id="auth-email" type="email" placeholder="이메일" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                <input id="auth-pw" type="password" placeholder="비밀번호" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
                 
-                <p id="auth-error" class="text-red-500 text-xs mt-1 hidden"></p>
+                <p id="auth-error" class="text-red-500 text-[11px] mt-1 hidden font-semibold bg-red-50 p-2 rounded"></p>
                 
                 <button id="btn-submit" class="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-md active:scale-95 mt-2">로그인</button>
-                
-                <div class="relative py-4">
-                    <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-100"></div></div>
-                    <span class="relative bg-white px-2 text-[10px] text-slate-400 font-bold ml-auto mr-auto block w-fit">또는</span>
-                </div>
-                
-                <button id="btn-anon" class="w-full border border-slate-200 text-slate-600 p-4 rounded-xl font-semibold hover:bg-slate-50 transition-all">비회원으로 접속</button>
+                <button id="btn-anon" class="w-full border border-slate-200 text-slate-500 p-3 rounded-xl font-medium hover:bg-slate-50 transition-all text-sm">비회원으로 접속</button>
             </div>
             
             <p class="mt-8 text-sm text-slate-500">
@@ -58,31 +55,47 @@
             </p>
         </div>
 
-        <!-- 채팅 화면 -->
+        <!-- 채팅 및 관리자 화면 -->
         <div id="chat-screen" class="hidden flex flex-col h-full">
-            <header class="h-16 border-b flex items-center justify-between px-6 bg-white shrink-0">
+            <header id="chat-header" class="h-16 border-b flex items-center justify-between px-6 bg-white shrink-0 transition-colors">
                 <div class="flex items-center gap-2">
-                    <div class="bg-indigo-600 p-1.5 rounded-lg text-white"><i data-lucide="message-square" class="w-5 h-5"></i></div>
-                    <span class="font-bold text-slate-800">MY CHAT</span>
+                    <div id="header-icon-bg" class="bg-indigo-600 p-1.5 rounded-lg text-white"><i id="header-icon" data-lucide="message-square" class="w-5 h-5"></i></div>
+                    <span id="header-title" class="font-bold text-slate-800 tracking-tight text-sm">MY CHAT</span>
                 </div>
-                <button id="btn-logout" class="text-slate-400 hover:text-red-500 transition-colors"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+                <div class="flex items-center gap-2">
+                    <button id="btn-admin-clear" class="hidden p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="전체 삭제">
+                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    </button>
+                    <button id="btn-logout" class="p-2 text-slate-400 hover:text-slate-600"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+                </div>
             </header>
 
             <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 hide-scroll chat-container">
-                <!-- 메시지 템플릿 영역 -->
+                <!-- 메시지 영역 -->
             </div>
 
             <footer class="p-4 bg-white border-t shrink-0">
                 <form id="chat-form" class="flex gap-2">
-                    <input id="chat-input" type="text" placeholder="메시지를 입력하세요..." class="flex-1 bg-slate-100 rounded-xl px-4 py-3 outline-none text-sm focus:ring-2 focus:ring-indigo-500 transition-all">
+                    <input id="chat-input" type="text" autocomplete="off" placeholder="메시지를 입력하세요..." class="flex-1 bg-slate-100 rounded-xl px-4 py-3 outline-none text-sm focus:ring-2 focus:ring-indigo-500 transition-all">
                     <button type="submit" class="bg-indigo-600 text-white p-3 rounded-xl shadow-md active:scale-90 transition-all"><i data-lucide="send" class="w-5 h-5"></i></button>
                 </form>
             </footer>
         </div>
     </div>
 
+    <!-- 커스텀 모달 (삭제 확인용) -->
+    <div id="modal" class="hidden fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-6">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-xs shadow-2xl">
+            <h3 class="font-bold text-slate-800 mb-2 text-lg">메시지 삭제</h3>
+            <p class="text-slate-500 text-sm mb-6">정말로 이 메시지를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.</p>
+            <div class="flex gap-2">
+                <button id="modal-cancel" class="flex-1 py-3 bg-slate-100 rounded-xl text-slate-600 font-bold text-sm">취소</button>
+                <button id="modal-confirm" class="flex-1 py-3 bg-red-500 rounded-xl text-white font-bold text-sm">삭제</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // --- 설정 ---
         const firebaseConfig = {
             apiKey: "AIzaSyCARqKQjjpzTSiPoXzf5eHBeXsvmV6pOY8",
             authDomain: "my-chat-7e514.firebaseapp.com",
@@ -93,34 +106,27 @@
             measurementId: "G-CE235JY3H0"
         };
 
-        // 초기화
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // UI 요소
         const loading = document.getElementById('loading');
         const authScreen = document.getElementById('auth-screen');
         const chatScreen = document.getElementById('chat-screen');
-        const authTitle = document.getElementById('auth-title');
-        const authNameInput = document.getElementById('auth-name');
-        const toggleText = document.getElementById('toggle-text');
-        const btnToggle = document.getElementById('btn-toggle');
-        const btnSubmit = document.getElementById('btn-submit');
-        const errorMsg = document.getElementById('auth-error');
+        const btnAdminClear = document.getElementById('btn-admin-clear');
         const messagesDiv = document.getElementById('messages');
-        const chatForm = document.getElementById('chat-form');
-        const chatInput = document.getElementById('chat-input');
+        const modal = document.getElementById('modal');
+        
+        let isAdmin = false;
+        let deleteId = null;
 
-        let isLoginMode = true;
-
-        // 아이콘 생성
         lucide.createIcons();
 
-        // 인증 상태 감시
         auth.onAuthStateChanged(user => {
             loading.classList.add('hidden');
             if (user) {
+                isAdmin = (user.displayName === 'Admin');
+                applyAdminUI();
                 authScreen.classList.add('hidden');
                 chatScreen.classList.remove('hidden');
                 initChat();
@@ -130,26 +136,55 @@
             }
         });
 
-        // 가입/로그인 토글
+        function applyAdminUI() {
+            const header = document.getElementById('chat-header');
+            const iconBg = document.getElementById('header-icon-bg');
+            const title = document.getElementById('header-title');
+            
+            if (isAdmin) {
+                header.classList.add('bg-red-50', 'border-red-200');
+                iconBg.classList.replace('bg-indigo-600', 'bg-red-500');
+                title.innerText = "ADMIN PANEL";
+                title.classList.add('text-red-700');
+                btnAdminClear.classList.remove('hidden');
+            } else {
+                header.classList.remove('bg-red-50', 'border-red-200');
+                iconBg.classList.replace('bg-red-500', 'bg-indigo-600');
+                title.innerText = "MY CHAT";
+                title.classList.remove('text-red-700');
+                btnAdminClear.classList.add('hidden');
+            }
+            lucide.createIcons();
+        }
+
+        // --- 인증 로직 ---
+        let isLoginMode = true;
+        const btnToggle = document.getElementById('btn-toggle');
+        const btnSubmit = document.getElementById('btn-submit');
+        const authNameInput = document.getElementById('auth-name');
+
         btnToggle.addEventListener('click', () => {
             isLoginMode = !isLoginMode;
-            authTitle.innerText = isLoginMode ? '반가워요!' : '가입하기';
+            document.getElementById('auth-title').innerText = isLoginMode ? '반가워요!' : '가입하기';
             btnSubmit.innerText = isLoginMode ? '로그인' : '회원가입';
-            toggleText.innerText = isLoginMode ? '계정이 없으신가요?' : '이미 계정이 있으신가요?';
-            btnToggle.innerText = isLoginMode ? '회원가입' : '로그인';
             authNameInput.classList.toggle('hidden', isLoginMode);
-            errorMsg.classList.add('hidden');
+            document.getElementById('auth-logo').className = isLoginMode 
+                ? "w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg transition-all"
+                : "w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg transition-all";
         });
 
-        // 인증 처리
         btnSubmit.addEventListener('click', async () => {
             const email = document.getElementById('auth-email').value;
             const pw = document.getElementById('auth-pw').value;
-            const name = authNameInput.value;
+            const name = authNameInput.value.trim();
+            const error = document.getElementById('auth-error');
 
-            errorMsg.classList.add('hidden');
-            btnSubmit.disabled = true;
-            btnSubmit.innerText = '처리 중...';
+            error.classList.add('hidden');
+            if (!email || !pw || (!isLoginMode && !name)) {
+                error.innerText = "모든 정보를 입력하세요.";
+                error.classList.remove('hidden');
+                return;
+            }
 
             try {
                 if (isLoginMode) {
@@ -160,65 +195,85 @@
                     location.reload();
                 }
             } catch (err) {
-                errorMsg.innerText = err.message;
-                errorMsg.classList.remove('hidden');
-            } finally {
-                btnSubmit.disabled = false;
-                btnSubmit.innerText = isLoginMode ? '로그인' : '회원가입';
+                error.innerText = "인증 실패: " + err.message;
+                error.classList.remove('hidden');
             }
         });
 
-        // 익명 접속
-        document.getElementById('btn-anon').addEventListener('click', async () => {
-            try { await auth.signInAnonymously(); } catch(e) { alert('익명 접속 기능이 꺼져있습니다.'); }
-        });
-
-        // 로그아웃
+        document.getElementById('btn-anon').addEventListener('click', () => auth.signInAnonymously());
         document.getElementById('btn-logout').addEventListener('click', () => auth.signOut());
 
-        // 채팅 초기화
+        // --- 채팅 및 관리 로직 ---
         function initChat() {
-            db.collection("messages").orderBy("createdAt", "asc").limit(100)
+            db.collection("messages").orderBy("createdAt", "asc").limit(200)
                 .onSnapshot(snapshot => {
                     messagesDiv.innerHTML = '';
                     snapshot.forEach(doc => {
-                        const data = doc.data();
-                        const isMine = data.senderId === auth.currentUser.uid;
-                        appendMessage(data.senderName, data.text, isMine);
+                        renderMessage(doc.id, doc.data());
                     });
                     messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                    lucide.createIcons();
                 });
         }
 
-        function appendMessage(name, text, isMine) {
+        function renderMessage(id, data) {
+            const isMine = data.senderId === auth.currentUser.uid;
             const div = document.createElement('div');
-            div.className = `flex ${isMine ? 'justify-end' : 'justify-start'}`;
+            div.className = `flex group ${isMine ? 'justify-end' : 'justify-start'}`;
+            
+            const adminButton = isAdmin ? `<button onclick="confirmDelete('${id}')" class="opacity-0 group-hover:opacity-100 p-1 text-red-300 hover:text-red-500 transition-all mr-1"><i data-lucide="x-circle" class="w-4 h-4"></i></button>` : '';
+
             div.innerHTML = `
-                <div class="flex flex-col max-w-[85%] ${isMine ? 'items-end' : 'items-start'}">
-                    <span class="text-[10px] text-slate-400 mb-1 px-1 font-bold">${name}</span>
-                    <div class="p-3 rounded-2xl text-sm shadow-sm ${isMine ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-700 border border-slate-200 rounded-tl-none'}">
-                        ${text}
+                <div class="flex items-end gap-1 ${isMine ? 'flex-row-reverse' : 'flex-row'}">
+                    <div class="flex flex-col max-w-[280px] ${isMine ? 'items-end' : 'items-start'}">
+                        <span class="text-[10px] text-slate-400 mb-1 px-1 font-bold">${data.senderName}</span>
+                        <div class="relative p-3 rounded-2xl text-sm shadow-sm ${isMine ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-700 border border-slate-200 rounded-tl-none'}">
+                            ${data.text}
+                        </div>
                     </div>
+                    ${adminButton}
                 </div>
             `;
             messagesDiv.appendChild(div);
         }
 
-        // 메시지 전송
-        chatForm.addEventListener('submit', async (e) => {
+        window.confirmDelete = (id) => {
+            deleteId = id;
+            modal.classList.remove('hidden');
+        };
+
+        document.getElementById('modal-cancel').onclick = () => modal.classList.add('hidden');
+        document.getElementById('modal-confirm').onclick = async () => {
+            if (deleteId) {
+                await db.collection("messages").doc(deleteId).delete();
+                modal.classList.add('hidden');
+                deleteId = null;
+            }
+        };
+
+        btnAdminClear.onclick = async () => {
+            if (!confirm("정말로 모든 대화 내용을 초기화하시겠습니까?")) return;
+            const snapshot = await db.collection("messages").get();
+            const batch = db.batch();
+            snapshot.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+        };
+
+        document.getElementById('chat-form').onsubmit = async (e) => {
             e.preventDefault();
-            const text = chatInput.value.trim();
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
             if (!text) return;
-            chatInput.value = '';
+            input.value = '';
             
             const user = auth.currentUser;
             await db.collection("messages").add({
                 text,
                 senderId: user.uid,
-                senderName: user.displayName || (user.isAnonymous ? "익명" : user.email.split('@')[0]),
+                senderName: user.displayName || "익명",
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-        });
+        };
     </script>
 </body>
 </html>
