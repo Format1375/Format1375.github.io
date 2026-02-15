@@ -3,32 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MY CHAT - 실시간 채팅</title>
+    <title>MY CHAT</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Firebase App & Services (Compat Version for high compatibility) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .hide-scroll::-webkit-scrollbar { display: none; }
-        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
+        body { font-family: 'Pretendard', sans-serif; }
+        .chat-container { height: calc(100vh - 130px); }
     </style>
 </head>
-<body class="bg-slate-50 h-screen overflow-hidden">
-    <div id="root" class="h-full"></div>
+<body class="bg-slate-100 h-screen">
+    <div id="app" class="max-w-md mx-auto h-full bg-white shadow-2xl flex flex-col relative">
+        <!-- 로딩 화면 -->
+        <div id="loading" class="absolute inset-0 z-50 bg-white flex flex-col items-center justify-center">
+            <div class="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+            <p class="mt-4 text-slate-500 font-medium">연결 중...</p>
+        </div>
 
-    <!-- React and Babel for browser-side compilation -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+        <!-- 인증 화면 -->
+        <div id="auth-screen" class="hidden flex-1 flex flex-col items-center justify-center p-8">
+            <div class="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg">
+                <i data-lucide="message-circle" class="w-10 h-10"></i>
+            </div>
+            <h2 id="auth-title" class="text-2xl font-bold text-slate-800 mb-2">반가워요!</h2>
+            <p class="text-slate-500 mb-8 text-sm text-center">나만의 실시간 채팅을 시작하세요</p>
+            
+            <div class="w-full space-y-3">
+                <input id="auth-name" type="text" placeholder="닉네임" class="hidden w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                <input id="auth-email" type="email" placeholder="이메일" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                <input id="auth-pw" type="password" placeholder="비밀번호 (6자 이상)" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                
+                <p id="auth-error" class="text-red-500 text-xs mt-1 hidden"></p>
+                
+                <button id="btn-submit" class="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-md active:scale-95 mt-2">로그인</button>
+                
+                <div class="relative py-4">
+                    <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-100"></div></div>
+                    <span class="relative bg-white px-2 text-[10px] text-slate-400 font-bold ml-auto mr-auto block w-fit">또는</span>
+                </div>
+                
+                <button id="btn-anon" class="w-full border border-slate-200 text-slate-600 p-4 rounded-xl font-semibold hover:bg-slate-50 transition-all">비회원으로 접속</button>
+            </div>
+            
+            <p class="mt-8 text-sm text-slate-500">
+                <span id="toggle-text">계정이 없으신가요?</span>
+                <button id="btn-toggle" class="text-indigo-600 font-bold ml-1 underline">회원가입</button>
+            </p>
+        </div>
 
-    <script type="text/babel">
-        // Firebase modules from CDN
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        <!-- 채팅 화면 -->
+        <div id="chat-screen" class="hidden flex flex-col h-full">
+            <header class="h-16 border-b flex items-center justify-between px-6 bg-white shrink-0">
+                <div class="flex items-center gap-2">
+                    <div class="bg-indigo-600 p-1.5 rounded-lg text-white"><i data-lucide="message-square" class="w-5 h-5"></i></div>
+                    <span class="font-bold text-slate-800">MY CHAT</span>
+                </div>
+                <button id="btn-logout" class="text-slate-400 hover:text-red-500 transition-colors"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+            </header>
 
-        const { useState, useEffect, useRef } = React;
+            <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 hide-scroll chat-container">
+                <!-- 메시지 템플릿 영역 -->
+            </div>
 
+            <footer class="p-4 bg-white border-t shrink-0">
+                <form id="chat-form" class="flex gap-2">
+                    <input id="chat-input" type="text" placeholder="메시지를 입력하세요..." class="flex-1 bg-slate-100 rounded-xl px-4 py-3 outline-none text-sm focus:ring-2 focus:ring-indigo-500 transition-all">
+                    <button type="submit" class="bg-indigo-600 text-white p-3 rounded-xl shadow-md active:scale-90 transition-all"><i data-lucide="send" class="w-5 h-5"></i></button>
+                </form>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        // --- 설정 ---
         const firebaseConfig = {
             apiKey: "AIzaSyCARqKQjjpzTSiPoXzf5eHBeXsvmV6pOY8",
             authDomain: "my-chat-7e514.firebaseapp.com",
@@ -39,142 +93,132 @@
             measurementId: "G-CE235JY3H0"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        // 초기화
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
 
-        function App() {
-            const [user, setUser] = useState(null);
-            const [loading, setLoading] = useState(true);
-            const [isLogin, setIsLogin] = useState(true);
-            const [email, setEmail] = useState('');
-            const [password, setPassword] = useState('');
-            const [name, setName] = useState('');
-            const [error, setError] = useState('');
-            const [messages, setMessages] = useState([]);
-            const [input, setInput] = useState('');
-            const scrollRef = useRef(null);
+        // UI 요소
+        const loading = document.getElementById('loading');
+        const authScreen = document.getElementById('auth-screen');
+        const chatScreen = document.getElementById('chat-screen');
+        const authTitle = document.getElementById('auth-title');
+        const authNameInput = document.getElementById('auth-name');
+        const toggleText = document.getElementById('toggle-text');
+        const btnToggle = document.getElementById('btn-toggle');
+        const btnSubmit = document.getElementById('btn-submit');
+        const errorMsg = document.getElementById('auth-error');
+        const messagesDiv = document.getElementById('messages');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
 
-            useEffect(() => {
-                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-                    setUser(currentUser);
-                    setLoading(false);
-                });
-                return () => unsubscribe();
-            }, []);
+        let isLoginMode = true;
 
-            useEffect(() => {
-                if (!user) return;
-                const q = collection(db, "messages");
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const msgs = [];
-                    snapshot.forEach(doc => msgs.push({ id: doc.id, ...doc.data() }));
-                    msgs.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
-                    setMessages(msgs);
-                    setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-                });
-                return () => unsubscribe();
-            }, [user]);
+        // 아이콘 생성
+        lucide.createIcons();
 
-            const handleAuth = async (e) => {
-                e.preventDefault();
-                setError('');
-                try {
-                    if (isLogin) {
-                        await signInWithEmailAndPassword(auth, email, password);
-                    } else {
-                        const res = await createUserWithEmailAndPassword(auth, email, password);
-                        await updateProfile(res.user, { displayName: name });
-                        window.location.reload(); 
-                    }
-                } catch (err) {
-                    setError('인증 실패: ' + err.message);
+        // 인증 상태 감시
+        auth.onAuthStateChanged(user => {
+            loading.classList.add('hidden');
+            if (user) {
+                authScreen.classList.add('hidden');
+                chatScreen.classList.remove('hidden');
+                initChat();
+            } else {
+                authScreen.classList.remove('hidden');
+                chatScreen.classList.add('hidden');
+            }
+        });
+
+        // 가입/로그인 토글
+        btnToggle.addEventListener('click', () => {
+            isLoginMode = !isLoginMode;
+            authTitle.innerText = isLoginMode ? '반가워요!' : '가입하기';
+            btnSubmit.innerText = isLoginMode ? '로그인' : '회원가입';
+            toggleText.innerText = isLoginMode ? '계정이 없으신가요?' : '이미 계정이 있으신가요?';
+            btnToggle.innerText = isLoginMode ? '회원가입' : '로그인';
+            authNameInput.classList.toggle('hidden', isLoginMode);
+            errorMsg.classList.add('hidden');
+        });
+
+        // 인증 처리
+        btnSubmit.addEventListener('click', async () => {
+            const email = document.getElementById('auth-email').value;
+            const pw = document.getElementById('auth-pw').value;
+            const name = authNameInput.value;
+
+            errorMsg.classList.add('hidden');
+            btnSubmit.disabled = true;
+            btnSubmit.innerText = '처리 중...';
+
+            try {
+                if (isLoginMode) {
+                    await auth.signInWithEmailAndPassword(email, pw);
+                } else {
+                    const res = await auth.createUserWithEmailAndPassword(email, pw);
+                    await res.user.updateProfile({ displayName: name });
+                    location.reload();
                 }
-            };
+            } catch (err) {
+                errorMsg.innerText = err.message;
+                errorMsg.classList.remove('hidden');
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = isLoginMode ? '로그인' : '회원가입';
+            }
+        });
 
-            const handleAnonymous = async () => {
-                try {
-                    await signInAnonymously(auth);
-                } catch (err) {
-                    setError('익명 접속 실패: ' + err.message);
-                }
-            };
+        // 익명 접속
+        document.getElementById('btn-anon').addEventListener('click', async () => {
+            try { await auth.signInAnonymously(); } catch(e) { alert('익명 접속 기능이 꺼져있습니다.'); }
+        });
 
-            const sendMessage = async (e) => {
-                e.preventDefault();
-                if (!input.trim()) return;
-                const text = input;
-                setInput('');
-                await addDoc(collection(db, "messages"), {
-                    text,
-                    senderId: user.uid,
-                    senderName: user.displayName || (user.isAnonymous ? "익명" : user.email.split('@')[0]),
-                    createdAt: serverTimestamp()
+        // 로그아웃
+        document.getElementById('btn-logout').addEventListener('click', () => auth.signOut());
+
+        // 채팅 초기화
+        function initChat() {
+            db.collection("messages").orderBy("createdAt", "asc").limit(100)
+                .onSnapshot(snapshot => {
+                    messagesDiv.innerHTML = '';
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        const isMine = data.senderId === auth.currentUser.uid;
+                        appendMessage(data.senderName, data.text, isMine);
+                    });
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
                 });
-            };
-
-            if (loading) return (
-                <div className="h-full flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                </div>
-            );
-
-            if (!user) return (
-                <div className="h-full flex items-center justify-center p-4">
-                    <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md">
-                        <h2 className="text-2xl font-bold mb-6 text-center text-slate-800">{isLogin ? '로그인' : '회원가입'}</h2>
-                        <form onSubmit={handleAuth} className="space-y-4">
-                            {!isLogin && <input type="text" placeholder="닉네임" value={name} onChange={e => setName(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" required />}
-                            <input type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" required />
-                            <input type="password" placeholder="비밀번호" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" required />
-                            {error && <p className="text-red-500 text-xs">{error}</p>}
-                            <button type="submit" className="w-full bg-indigo-600 text-white p-3 rounded-xl font-bold hover:bg-indigo-700 transition-all">{isLogin ? '로그인' : '가입하기'}</button>
-                        </form>
-                        <button onClick={handleAnonymous} className="w-full mt-4 border border-slate-200 p-3 rounded-xl font-semibold text-slate-600 hover:bg-slate-50 transition-all">비회원으로 접속</button>
-                        <p className="mt-6 text-center text-sm text-slate-500">
-                            {isLogin ? "계정이 없으신가요?" : "계정이 있으신가요?"} 
-                            <span onClick={() => setIsLogin(!isLogin)} className="text-indigo-600 ml-2 cursor-pointer font-bold underline">
-                                {isLogin ? '가입하기' : '로그인'}
-                            </span>
-                        </p>
-                    </div>
-                </div>
-            );
-
-            return (
-                <div className="h-full flex flex-col bg-white max-w-lg mx-auto shadow-2xl">
-                    <header className="p-4 border-b flex justify-between items-center bg-white">
-                        <h1 className="font-bold text-indigo-600">MY CHAT</h1>
-                        <button onClick={() => signOut(auth)} className="text-slate-400 hover:text-red-500"><i data-lucide="log-out"></i></button>
-                    </header>
-                    <main className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
-                        {messages.map(msg => (
-                            <div key={msg.id} className={`flex ${msg.senderId === user.uid ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[80%] ${msg.senderId === user.uid ? 'items-end' : 'items-start'}`}>
-                                    <span className="text-[10px] text-slate-400 mb-1 block px-1">{msg.senderName}</span>
-                                    <div className={`p-3 rounded-2xl text-sm shadow-sm ${msg.senderId === user.uid ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-700 rounded-tl-none border border-slate-100'}`}>
-                                        {msg.text}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                        <div ref={scrollRef}></div>
-                    </main>
-                    <footer className="p-4 bg-white border-t">
-                        <form onSubmit={sendMessage} className="flex gap-2">
-                            <input type="text" value={input} onChange={e => setInput(e.target.value)} placeholder="메시지 입력..." className="flex-1 bg-slate-100 p-3 rounded-xl outline-none text-sm" />
-                            <button type="submit" className="bg-indigo-600 text-white p-3 rounded-xl"><i data-lucide="send"></i></button>
-                        </form>
-                    </footer>
-                </div>
-            );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-        
-        // Initialize lucide icons after render
-        setTimeout(() => lucide.createIcons(), 500);
+        function appendMessage(name, text, isMine) {
+            const div = document.createElement('div');
+            div.className = `flex ${isMine ? 'justify-end' : 'justify-start'}`;
+            div.innerHTML = `
+                <div class="flex flex-col max-w-[85%] ${isMine ? 'items-end' : 'items-start'}">
+                    <span class="text-[10px] text-slate-400 mb-1 px-1 font-bold">${name}</span>
+                    <div class="p-3 rounded-2xl text-sm shadow-sm ${isMine ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-700 border border-slate-200 rounded-tl-none'}">
+                        ${text}
+                    </div>
+                </div>
+            `;
+            messagesDiv.appendChild(div);
+        }
+
+        // 메시지 전송
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = chatInput.value.trim();
+            if (!text) return;
+            chatInput.value = '';
+            
+            const user = auth.currentUser;
+            await db.collection("messages").add({
+                text,
+                senderId: user.uid,
+                senderName: user.displayName || (user.isAnonymous ? "익명" : user.email.split('@')[0]),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        });
     </script>
 </body>
 </html>
